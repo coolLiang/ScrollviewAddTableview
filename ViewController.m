@@ -7,16 +7,18 @@
 //
 
 #import "ViewController.h"
+#import "MJRefresh.h"
 
 //随机颜色
 #define random(r, g, b, a) [UIColor colorWithRed:(r)/255.0 green:(g)/255.0 blue:(b)/255.0 alpha:(a)/255.0]
 
 #define randomColor random(arc4random_uniform(256), arc4random_uniform(256), arc4random_uniform(256), arc4random_uniform(256))
 
-#define CUTOFFVIEWY  270
-#define CUTOFFVIEWHEIGHT  30
+#define CUTOFFVIEWY  240
+#define CUTOFFVIEWHEIGHT 60
 #define APPENDINGHEIGHT  300
 #define NAVIBARHEIGHT  64
+#define SUPERVIEWTAG   110
 
 @interface ViewController ()<UITableViewDelegate,UITableViewDataSource>
 
@@ -27,6 +29,8 @@
 @property(nonatomic,strong)UIView * cutoffview;
 
 @property(nonatomic,assign)BOOL notUpdate;
+
+@property(nonatomic,strong)NSMutableArray * dataArray;
 
 @end
 
@@ -42,7 +46,7 @@
     self.scrollview.contentSize = CGSizeMake(self.view.frame.size.width, self.view.frame.size.height + APPENDINGHEIGHT);
     self.scrollview.backgroundColor = [UIColor whiteColor];
     [self.scrollview setScrollEnabled:NO];
-    self.scrollview.tag = 110;
+    self.scrollview.tag = SUPERVIEWTAG;
     self.scrollview.delegate = self;
     self.scrollview.bounces = NO;
     [self.view addSubview:self.scrollview];
@@ -52,18 +56,67 @@
     self.cutoffview.frame = CGRectMake(0, CUTOFFVIEWY, self.view.frame.size.width, CUTOFFVIEWHEIGHT);
     [self.scrollview addSubview:self.cutoffview];
     
-    self.tableview = [[UITableView alloc]initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height - 64 + 300) style:UITableViewStylePlain];
+    self.tableview = [[UITableView alloc]initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height - NAVIBARHEIGHT + APPENDINGHEIGHT) style:UITableViewStylePlain];
     self.tableview.delegate = self;
     self.tableview.dataSource = self;
     self.tableview.backgroundColor = [UIColor clearColor];
 
-    self.tableview.contentInset = UIEdgeInsetsMake(300, 0, 0, 0);
+    self.tableview.contentInset = UIEdgeInsetsMake(APPENDINGHEIGHT, 0, 0, 0);
     [self.scrollview addSubview:self.tableview];
     
     [self.scrollview bringSubviewToFront:self.cutoffview];
     
     
+    [self addTableRefresh];
+    
+    self.dataArray = [NSMutableArray new];
+    for (int i = 0;  i < 10; i ++) {
+        
+        [self.dataArray addObject:@(0)];
+    }
+    
     // Do any additional setup after loading the view, typically from a nib.
+}
+
+-(void)addTableRefresh
+{
+    __weak typeof(self) weakSelf = self;
+    
+    [self.tableview addLegendFooterWithRefreshingBlock:^{
+        
+        __strong typeof(self) strongSelf = weakSelf;
+        
+        for (int i = 0; i < 10; i ++) {
+            
+            [strongSelf.dataArray addObject:@(0)];
+        }
+        
+        [strongSelf performSelector:@selector(cancelRefresh) withObject:strongSelf afterDelay:3];
+        
+    }];
+    
+    [self.tableview addLegendHeaderWithRefreshingBlock:^{
+        
+        __strong typeof(self) strongSelf = weakSelf;
+        
+        [strongSelf.dataArray removeAllObjects];
+        
+        for (int i = 0; i < 10; i ++) {
+            
+            [strongSelf.dataArray addObject:@(0)];
+        }
+        
+        [strongSelf performSelector:@selector(cancelRefresh) withObject:strongSelf afterDelay:3];
+    }];
+}
+
+-(void)cancelRefresh
+{
+    [self.tableview.header endRefreshing];
+    [self.tableview.footer endRefreshing];
+    
+    [self.tableview reloadData];
+    
 }
 
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
@@ -73,7 +126,7 @@
 
 -(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    return 10;
+    return self.dataArray.count;
 }
 
 -(UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -103,9 +156,11 @@
     CGPoint contentOffset = scrollView.contentOffset;
     //初始偏移值重置。
     CGFloat yMargin;
-//    = contentOffset.y + 300;
     
-    if (scrollView.tag == 110) {
+    NSLog(@"111当前table的偏移%@",NSStringFromCGPoint(self.tableview.contentOffset));
+    NSLog(@"111当前scroll的偏移%@",NSStringFromCGPoint(self.scrollview.contentOffset));
+
+    if (scrollView.tag == SUPERVIEWTAG) {
         
         yMargin = contentOffset.y;
         
@@ -120,22 +175,20 @@
              self.cutoffview.frame = CGRectMake(0, CUTOFFVIEWY - yMargin, self.view.frame.size.width, CUTOFFVIEWHEIGHT);
         }
         
-        NSLog(@"当前cutoffview的坐标为%@",NSStringFromCGRect(self.cutoffview.frame));
-        
     }
     else
     {
-        yMargin = contentOffset.y + 300;
+        yMargin = contentOffset.y + APPENDINGHEIGHT;
         
-        if (yMargin <= 300 && yMargin > 0) {
+        if (yMargin <= APPENDINGHEIGHT && yMargin > 0) {
             
             [self.scrollview setContentOffset:CGPointMake(scrollView.contentOffset.x, yMargin) animated:NO];
 
         }
         
-        else if (yMargin > 300)
+        else if (yMargin > APPENDINGHEIGHT)
         {
-            [self.scrollview setContentOffset:CGPointMake(scrollView.contentOffset.x, 300) animated:NO];
+            [self.scrollview setContentOffset:CGPointMake(scrollView.contentOffset.x, APPENDINGHEIGHT) animated:NO];
         }
         else
         {
@@ -144,14 +197,14 @@
             
             [self updateTheUI];
             
-            
         }
         
-        NSLog(@"当前table的偏移%@",NSStringFromCGPoint(scrollView.contentOffset));
+        NSLog(@"222当前table的偏移%@",NSStringFromCGPoint(self.tableview.contentOffset));
+        NSLog(@"222当前scroll的偏移%@",NSStringFromCGPoint(self.scrollview.contentOffset));
 //
 //        NSLog(@"当前table的坐标%@",NSStringFromCGRect(scrollView.frame));
 //        
-        NSLog(@"当前scroll的偏移%@",NSStringFromCGPoint(self.scrollview.contentOffset));
+
 //
 //        NSLog(@"当前scroll的坐标%@",NSStringFromCGRect(self.scrollview.frame));
     }
@@ -161,17 +214,20 @@
 {
     [super viewDidAppear:animated];
     
-    NSLog(@"%@",NSStringFromCGRect(self.cutoffview.frame));
+    NSLog(@"111当前table的偏移%@",NSStringFromCGPoint(self.tableview.contentOffset));
     
-    NSLog(@"%@",NSStringFromCGRect(self.view.frame));
-    
-    NSLog(@"%@",NSStringFromCGRect(self.tableview.frame));
+//    NSLog(@"%@",NSStringFromCGRect(self.cutoffview.frame));
+//    
+//    NSLog(@"%@",NSStringFromCGRect(self.view.frame));
+//    
+//    NSLog(@"%@",NSStringFromCGRect(self.tableview.frame));
     
 }
 
 -(void)updateTheUI
 {
     self.cutoffview.frame = CGRectMake(0, CUTOFFVIEWY, self.view.frame.size.width, CUTOFFVIEWHEIGHT);
+    
 }
 
 - (void)didReceiveMemoryWarning {
